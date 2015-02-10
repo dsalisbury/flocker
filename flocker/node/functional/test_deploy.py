@@ -11,9 +11,10 @@ from pyrsistent import pmap
 from twisted.trial.unittest import TestCase
 from twisted.python.filepath import FilePath
 
-from .. import (
-    Deployer, Deployment, Application, DockerImage, Node, AttachedVolume, Link)
-from .._model import Manifestation, Dataset
+from .. import P2PNodeDeployer, change_node_state
+from ...control._model import (
+    Deployment, Application, DockerImage, Node, AttachedVolume, Link,
+    Manifestation, Dataset)
 from .._docker import DockerClient
 from ..testtools import wait_for_unit_state, if_docker_configured
 from ...testtools import (
@@ -34,8 +35,10 @@ class DeployerTests(TestCase):
         """
         name = random_name()
         docker_client = DockerClient()
-        deployer = Deployer(create_volume_service(self), docker_client,
-                            make_memory_network())
+        deployer = P2PNodeDeployer(
+            u"localhost",
+            create_volume_service(self), docker_client,
+            make_memory_network())
         self.addCleanup(docker_client.remove, name)
 
         desired_state = Deployment(nodes=frozenset([
@@ -47,9 +50,8 @@ class DeployerTests(TestCase):
                      links=frozenset(),
                      )]))]))
 
-        d = deployer.change_node_state(desired_state,
-                                       Deployment(nodes=frozenset()),
-                                       u"localhost")
+        d = change_node_state(deployer, desired_state,
+                              Deployment(nodes=frozenset()))
         d.addCallback(lambda _: wait_for_unit_state(docker_client, name,
                                                     [u'active']))
 
@@ -63,8 +65,7 @@ class DeployerTests(TestCase):
 
         def stopped(_):
             # Redeploy, which should restart it:
-            return deployer.change_node_state(desired_state, desired_state,
-                                              u"localhost")
+            return change_node_state(deployer, desired_state, desired_state)
         d.addCallback(stopped)
         d.addCallback(lambda _: wait_for_unit_state(docker_client, name,
                                                     [u'active']))
@@ -88,8 +89,9 @@ class DeployerTests(TestCase):
         self.addCleanup(docker_client.remove, application_name)
 
         volume_service = create_volume_service(self)
-        deployer = Deployer(volume_service, docker_client,
-                            make_memory_network())
+        deployer = P2PNodeDeployer(
+            u"localhost", volume_service, docker_client,
+            make_memory_network())
 
         expected_variables = frozenset({
             'key1': 'value1',
@@ -115,9 +117,8 @@ class DeployerTests(TestCase):
                      links=frozenset(),
                      )]))]))
 
-        d = deployer.change_node_state(desired_state,
-                                       Deployment(nodes=frozenset()),
-                                       u"localhost")
+        d = change_node_state(deployer, desired_state,
+                              Deployment(nodes=frozenset()))
         d.addCallback(lambda _: volume_service.enumerate())
         d.addCallback(lambda volumes:
                       list(volumes)[0].get_filesystem().get_path().child(
@@ -156,8 +157,9 @@ class DeployerTests(TestCase):
         self.addCleanup(docker_client.remove, application_name)
 
         volume_service = create_volume_service(self)
-        deployer = Deployer(volume_service, docker_client,
-                            make_memory_network())
+        deployer = P2PNodeDeployer(
+            u"localhost", volume_service, docker_client,
+            make_memory_network())
 
         expected_variables = frozenset({
             'ALIAS_PORT_80_TCP': 'tcp://localhost:8080',
@@ -188,9 +190,8 @@ class DeployerTests(TestCase):
                          ),
                      )]))]))
 
-        d = deployer.change_node_state(desired_state,
-                                       Deployment(nodes=frozenset()),
-                                       u"localhost")
+        d = change_node_state(deployer, desired_state,
+                              Deployment(nodes=frozenset()))
         d.addCallback(lambda _: volume_service.enumerate())
         d.addCallback(lambda volumes:
                       list(volumes)[0].get_filesystem().get_path().child(
@@ -228,8 +229,9 @@ class DeployerTests(TestCase):
         self.addCleanup(docker_client.remove, application_name)
 
         volume_service = create_volume_service(self)
-        deployer = Deployer(volume_service, docker_client,
-                            make_memory_network())
+        deployer = P2PNodeDeployer(
+            u"localhost", volume_service, docker_client,
+            make_memory_network())
 
         desired_state = Deployment(nodes=frozenset([
             Node(hostname=u"localhost",
@@ -239,9 +241,8 @@ class DeployerTests(TestCase):
                      memory_limit=EXPECTED_MEMORY_LIMIT
                      )]))]))
 
-        d = deployer.change_node_state(desired_state,
-                                       Deployment(nodes=frozenset()),
-                                       u"localhost")
+        d = change_node_state(deployer, desired_state,
+                              Deployment(nodes=frozenset()))
         d.addCallback(lambda _: wait_for_unit_state(
             docker_client,
             application_name,
@@ -276,8 +277,9 @@ class DeployerTests(TestCase):
         self.addCleanup(docker_client.remove, application_name)
 
         volume_service = create_volume_service(self)
-        deployer = Deployer(volume_service, docker_client,
-                            make_memory_network())
+        deployer = P2PNodeDeployer(
+            u"localhost", volume_service, docker_client,
+            make_memory_network())
 
         desired_state = Deployment(nodes=frozenset([
             Node(hostname=u"localhost",
@@ -287,9 +289,8 @@ class DeployerTests(TestCase):
                      cpu_shares=EXPECTED_CPU_SHARES
                      )]))]))
 
-        d = deployer.change_node_state(desired_state,
-                                       Deployment(nodes=frozenset()),
-                                       u"localhost")
+        d = change_node_state(deployer, desired_state,
+                              Deployment(nodes=frozenset()))
         d.addCallback(lambda _: wait_for_unit_state(
             docker_client,
             application_name,
